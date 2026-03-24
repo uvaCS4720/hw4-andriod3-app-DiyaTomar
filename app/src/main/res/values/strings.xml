@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">My Application</string>
+    <string name="app_name">Campus Maps</string>
+    <string name="tag_dropdown_label">Filter by tag</string>
+    <string name="map_content_description">UVA campus map</string>
 </resources>

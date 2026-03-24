@@ -1,41 +1,79 @@
 package edu.nd.pmcburne.hello
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import edu.nd.pmcburne.hello.data.CampusLocation
+import edu.nd.pmcburne.hello.data.CampusRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-data class MainUIState(
-    val counterValue: Int
-)
+private const val DefaultTag = "core"
 
-class MainViewModel(
-    val initialCounterValue: Int = 0
-) : ViewModel() {
-    private val _uiState = MutableStateFlow(MainUIState(initialCounterValue))
-    val uiState: StateFlow<MainUIState> = _uiState.asStateFlow()
+data class MainUiState(
+    val isLoading: Boolean = true,
+    val selectedTag: String = DefaultTag,
+    val availableTags: List<String> = listOf(DefaultTag),
+    val locations: List<CampusLocation> = emptyList(),
+    val errorMessage: String? = null
+) {
+    val filteredLocations: List<CampusLocation>
+        get() = locations.filter { selectedTag in it.tags }
+}
 
-    fun incrementCounter() {
-        _uiState.update{ currentState ->
-            currentState.copy(counterValue = _uiState.value.counterValue + 1)
-        }
+class MainViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository = CampusRepository(application)
+
+    private val _uiState = MutableStateFlow(MainUiState())
+    val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    init {
+        refreshLocations()
     }
 
-    fun decrementCounter() {
-        _uiState.update{ currentState ->
-            currentState.copy(counterValue = _uiState.value.counterValue - 1)
-        }
-    }
-
-    fun resetCounter() {
+    fun onTagSelected(tag: String) {
         _uiState.update { currentState ->
-            currentState.copy(counterValue = 0)
+            currentState.copy(selectedTag = tag)
         }
     }
 
-    val isDecrementEnabled: Boolean
-        get() = _uiState.value.counterValue > 0
-    val isResetEnabled: Boolean
-        get() = _uiState.value.counterValue > 0
+    fun refreshLocations() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            val syncError = try {
+                repository.synchronizeLocations()
+                null
+            } catch (exception: Exception) {
+                Log.e("CampusMaps", "Failed to synchronize campus locations", exception)
+                exception.localizedMessage ?: "Unable to update campus locations."
+            }
+
+            val storedLocations = repository.getStoredLocations()
+            val tags = storedLocations
+                .flatMap(CampusLocation::tags)
+                .distinct()
+                .sortedBy(String::lowercase)
+
+            _uiState.update { currentState ->
+                val nextSelectedTag = when {
+                    currentState.selectedTag in tags -> currentState.selectedTag
+                    DefaultTag in tags -> DefaultTag
+                    tags.isNotEmpty() -> tags.first()
+                    else -> DefaultTag
+                }
+                currentState.copy(
+                    isLoading = false,
+                    selectedTag = nextSelectedTag,
+                    availableTags = if (tags.isEmpty()) listOf(DefaultTag) else tags,
+                    locations = storedLocations,
+                    errorMessage = syncError
+                )
+            }
+        }
+    }
 }
