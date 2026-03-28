@@ -2,6 +2,8 @@
 
 The list is scrollable, you can use the up and down arrow keys to scroll through the dropdown menu options
 
+If you click on a marker text bubble, it will show the full description text
+
 Google Maps setup:
 
 Add the following line to `local.properties` before running the app:
