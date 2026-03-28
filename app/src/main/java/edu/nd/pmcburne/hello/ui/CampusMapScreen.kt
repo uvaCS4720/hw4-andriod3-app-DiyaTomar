@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import edu.nd.pmcburne.hello.MainUiState
+import edu.nd.pmcburne.hello.data.CampusLocation
 
 private val DefaultCampusCenter = LatLng(38.0357, -78.5034)
 private const val DefaultZoom = 15f
@@ -51,6 +53,7 @@ fun CampusMapScreen(
     modifier: Modifier = Modifier
 ) {
     val cameraPositionState = rememberCameraPositionState()
+    val (selectedLocation, setSelectedLocation) = remember { mutableStateOf<CampusLocation?>(null) }
 
     LaunchedEffect(uiState.selectedTag, uiState.filteredLocations) {
         val target = uiState.filteredLocations.firstOrNull()?.let {
@@ -112,7 +115,8 @@ fun CampusMapScreen(
                         Marker(
                             state = MarkerState(position = LatLng(location.latitude, location.longitude)),
                             title = location.name,
-                            snippet = location.description
+                            snippet = location.description,
+                            onInfoWindowClick = { setSelectedLocation(location) }
                         )
                     }
                 }
@@ -134,6 +138,27 @@ fun CampusMapScreen(
                     Text("Loading campus locations")
                 }
             }
+        }
+
+        selectedLocation?.let { location ->
+            AlertDialog(
+                onDismissRequest = { setSelectedLocation(null) },
+                title = { Text(location.name) },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 320.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(location.description)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { setSelectedLocation(null) }) {
+                        Text("Close")
+                    }
+                }
+            )
         }
     }
 }
